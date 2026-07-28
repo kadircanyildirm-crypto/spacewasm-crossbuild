@@ -74,6 +74,34 @@ CMake builds should pass their linker and sysroots to cargo — a concrete
 starting point, since the current default is the *host* triple from `rustc -vV`
 and a mismatch surfaces only at link time.
 
+### `cases/cross-triple-fix/`
+
+Builds the same commit with the same toolchain file twice — once unpatched,
+once with `proposed/SpacewasmRustTarget.cmake` included by the consuming
+project — and compares the architecture of the resulting archive.
+
+| Variant | cargo target dir | archive |
+| --- | --- | --- |
+| unpatched | `x86_64-unknown-linux-gnu` | ELF64 / x86-64 |
+| with the module | `i686-unknown-linux-gnu` | ELF32 / Intel 80386 |
+
+## `proposed/`
+
+`SpacewasmRustTarget.cmake` derives `SPACEWASM_TARGET` from `CMAKE_SYSTEM_NAME`
+and `CMAKE_SYSTEM_PROCESSOR`, and hard-errors when cross-compiling for a
+combination it has no mapping for, rather than silently falling back to the
+host triple.
+
+It requires no upstream change: `SPACEWASM_TARGET` is a `CACHE STRING`, so
+setting it before `add_subdirectory()` leaves the existing
+`if(SPACEWASM_TARGET STREQUAL "")` branch untouched.
+
+It covers the triple only. Forwarding the C toolchain — `CC_<triple>`,
+`AR_<triple>`, `CFLAGS_<triple>`, `CARGO_TARGET_<TRIPLE>_LINKER`, `--sysroot` —
+has to happen on the cargo invocation itself, which lives in the
+`ExternalProject_Add` `BUILD_COMMAND` upstream. That part is not implemented
+here; it is a proposal for discussion on #112.
+
 ## Reporting
 
 Findings from this repo are reported upstream on the relevant issue or pull
