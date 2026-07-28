@@ -15,8 +15,9 @@
 set -uo pipefail
 
 UPSTREAM="https://github.com/nasa/spacewasm.git"
-PR_REF="refs/pull/130/head"
-PINNED_SHA="a1ef2caff5e79eb3249d26531dafc93dbcd91bcc"   # nasa/spacewasm#130 head, 2026-07-27
+# Pinned to the exact commit, not refs/pull/130/head: that ref moves whenever the
+# author pushes, and this case documents one specific state of the branch.
+PINNED_SHA="a1ef2caff5e79eb3249d26531dafc93dbcd91bcc"   # nasa/spacewasm#130, 2026-07-27
 
 WORK="${WORK:-/tmp/case-gnuinstalldirs}"
 SRC="${SPACEWASM_SRC:-$WORK/spacewasm}"
@@ -31,16 +32,15 @@ if [ ! -d "$SRC/.git" ]; then
   mkdir -p "$SRC"
   git -C "$SRC" init -q
   git -C "$SRC" remote add origin "$UPSTREAM"
-  git -C "$SRC" fetch -q --depth 1 origin "$PR_REF" || {
-    echo "FATAL: could not fetch $PR_REF from $UPSTREAM"; exit 2; }
+  git -C "$SRC" fetch -q --depth 1 origin "$PINNED_SHA" || {
+    echo "FATAL: could not fetch $PINNED_SHA from $UPSTREAM"; exit 2; }
   git -C "$SRC" checkout -q FETCH_HEAD
 fi
 ACTUAL_SHA="$(git -C "$SRC" rev-parse HEAD)"
 echo "pinned: $PINNED_SHA"
 echo "actual: $ACTUAL_SHA"
 if [ "$ACTUAL_SHA" != "$PINNED_SHA" ]; then
-  echo "NOTE: upstream ref moved since this case was written."
-  echo "      The observation below may no longer apply."
+  echo "FATAL: checked-out commit is not the pinned one."; exit 2
 fi
 
 CAPI="$SRC/crates/spacewasm_c_api"
@@ -82,8 +82,11 @@ echo
 echo "== verdict =="
 if [ "$A_EXIT" -ne 0 ] && [ "$B_EXIT" -eq 0 ]; then
   echo "REPRODUCED: configure fails only when the parent omits include(GNUInstallDirs)."
-  echo "Suggested fix: add 'include(GNUInstallDirs)' near the top of"
-  echo "               crates/spacewasm_c_api/CMakeLists.txt"
+  echo
+  echo "Resolved upstream in ca42f9c (2026-07-28), which removes both install()"
+  echo "calls instead of adding the module — F' consumes the crate through"
+  echo "add_subdirectory() and does not install it. This case is kept pinned to"
+  echo "a1ef2ca as the record of the reported state."
   exit 0
 elif [ "$A_EXIT" -eq 0 ] && [ "$B_EXIT" -eq 0 ]; then
   echo "NOT REPRODUCED: both configure cleanly — likely fixed upstream."

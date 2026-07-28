@@ -23,8 +23,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TOOLCHAIN="$REPO_ROOT/dev/i686-linux.cmake"
 
 UPSTREAM="https://github.com/nasa/spacewasm.git"
-PR_REF="refs/pull/130/head"
-PINNED_SHA="a1ef2caff5e79eb3249d26531dafc93dbcd91bcc"   # nasa/spacewasm#130 head, 2026-07-27
+# Pinned to the exact commit, not refs/pull/130/head: that ref moves whenever the
+# author pushes, which would silently change what this case measures.
+PINNED_SHA="ca42f9c255d083a7fdaabfcb33118846996b40b1"   # nasa/spacewasm#130, 2026-07-28
 
 WORK="${WORK:-/tmp/case-cross-triple}"
 SRC="${SPACEWASM_SRC:-$WORK/spacewasm}"
@@ -41,27 +42,23 @@ if [ ! -d "$SRC/.git" ]; then
   mkdir -p "$SRC"
   git -C "$SRC" init -q
   git -C "$SRC" remote add origin "$UPSTREAM"
-  git -C "$SRC" fetch -q --depth 1 origin "$PR_REF" || {
-    echo "FATAL: could not fetch $PR_REF from $UPSTREAM"; exit 2; }
+  git -C "$SRC" fetch -q --depth 1 origin "$PINNED_SHA" || {
+    echo "FATAL: could not fetch $PINNED_SHA from $UPSTREAM"; exit 2; }
   git -C "$SRC" checkout -q FETCH_HEAD
 fi
 ACTUAL_SHA="$(git -C "$SRC" rev-parse HEAD)"
 echo "pinned: $PINNED_SHA"
 echo "actual: $ACTUAL_SHA"
-[ "$ACTUAL_SHA" != "$PINNED_SHA" ] && echo "NOTE: upstream ref moved; observation may not apply."
+[ "$ACTUAL_SHA" != "$PINNED_SHA" ] && { echo "FATAL: not the pinned commit."; exit 2; }
 echo
 
 CAPI="$SRC/crates/spacewasm_c_api"
 BUILD="$WORK/build"
 
 echo "== configure with i686 toolchain file, SPACEWASM_TARGET unset =="
-echo "   (install dirs passed explicitly to get past the GNUInstallDirs issue —"
-echo "    see cases/gnuinstalldirs/)"
 cmake -S "$CAPI" -B "$BUILD" \
       -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" \
-      -DCMAKE_BUILD_TYPE=Debug \
-      -DCMAKE_INSTALL_INCLUDEDIR=include \
-      -DCMAKE_INSTALL_LIBDIR=lib 2>&1 | tail -4
+      -DCMAKE_BUILD_TYPE=Debug 2>&1 | tail -4
 CFG_EXIT=${PIPESTATUS[0]}
 echo "CONFIGURE_EXIT=$CFG_EXIT"
 [ "$CFG_EXIT" -ne 0 ] && { echo "FATAL: configure failed"; exit 2; }

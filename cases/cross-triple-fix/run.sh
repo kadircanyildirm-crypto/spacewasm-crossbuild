@@ -22,8 +22,9 @@ TOOLCHAIN="$REPO_ROOT/dev/i686-linux.cmake"
 MODULE="$REPO_ROOT/proposed/SpacewasmRustTarget.cmake"
 
 UPSTREAM="https://github.com/nasa/spacewasm.git"
-PR_REF="refs/pull/130/head"
-PINNED_SHA="a1ef2caff5e79eb3249d26531dafc93dbcd91bcc"
+# Pinned to the exact commit, not refs/pull/130/head: that ref moves whenever the
+# author pushes, which would silently change what this case measures.
+PINNED_SHA="ca42f9c255d083a7fdaabfcb33118846996b40b1"   # nasa/spacewasm#130, 2026-07-28
 
 WORK="${WORK:-/tmp/case-cross-triple-fix}"
 SRC="${SPACEWASM_SRC:-$WORK/spacewasm}"
@@ -37,11 +38,13 @@ if [ ! -d "$SRC/.git" ]; then
   mkdir -p "$SRC"
   git -C "$SRC" init -q
   git -C "$SRC" remote add origin "$UPSTREAM"
-  git -C "$SRC" fetch -q --depth 1 origin "$PR_REF" || { echo "FATAL: fetch failed"; exit 2; }
+  git -C "$SRC" fetch -q --depth 1 origin "$PINNED_SHA" || { echo "FATAL: fetch failed"; exit 2; }
   git -C "$SRC" checkout -q FETCH_HEAD
 fi
+ACTUAL_SHA="$(git -C "$SRC" rev-parse HEAD)"
 echo "pinned: $PINNED_SHA"
-echo "actual: $(git -C "$SRC" rev-parse HEAD)"
+echo "actual: $ACTUAL_SHA"
+[ "$ACTUAL_SHA" != "$PINNED_SHA" ] && { echo "FATAL: not the pinned commit."; exit 2; }
 CAPI="$SRC/crates/spacewasm_c_api"
 echo
 

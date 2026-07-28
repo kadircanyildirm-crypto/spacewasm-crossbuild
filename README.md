@@ -42,8 +42,10 @@ that test.
 
 ## Cases
 
-Each case is a single `run.sh` that fetches the pinned upstream commit, runs a
-controlled experiment, and prints an explicit verdict. Run them inside the image:
+Each case is a single `run.sh` that fetches one exact upstream commit — by SHA,
+not by `refs/pull/N/head`, so a later push to the branch cannot quietly change
+what is being measured — runs a controlled experiment, and prints an explicit
+verdict. Run them inside the image:
 
 ```sh
 docker run --rm -v "$PWD:/repo" spacewasm-dev bash /repo/cases/<name>/run.sh
@@ -60,11 +62,19 @@ has already called `include(GNUInstallDirs)`. `CMAKE_INSTALL_INCLUDEDIR` and
 calls receive an empty `DESTINATION` and configuration aborts. The case runs the
 same parent project with and without the `include()` to isolate the cause.
 
+**Status: resolved upstream.** Reported on
+[PR #130](https://github.com/nasa/spacewasm/pull/130#issuecomment-5101181671)
+and fixed the same day in
+[`ca42f9c`](https://github.com/nasa/spacewasm/commit/ca42f9c255d083a7fdaabfcb33118846996b40b1),
+which drops both `install()` calls rather than adding the module — F´ consumes
+the crate through `add_subdirectory()` and does not need them. The case stays
+pinned to `a1ef2ca` as the record of what was reported.
+
 ### `cases/cross-triple/`
 
-Records what target triple reaches cargo when CMake is configured with a
-cross-compilation toolchain file, and reports the architecture of the resulting
-`libspacewasm_c_api.a`.
+Pinned to `ca42f9c`. Records what target triple reaches cargo when CMake is
+configured with a cross-compilation toolchain file, and reports the architecture
+of the resulting `libspacewasm_c_api.a`.
 
 This is an observation, not a defect report: `crates/spacewasm_c_api/README.md`
 documents that cross compiling requires setting `SPACEWASM_TARGET` explicitly.
@@ -76,9 +86,9 @@ and a mismatch surfaces only at link time.
 
 ### `cases/cross-triple-fix/`
 
-Builds the same commit with the same toolchain file twice — once unpatched,
-once with `proposed/SpacewasmRustTarget.cmake` included by the consuming
-project — and compares the architecture of the resulting archive.
+Pinned to `ca42f9c`. Builds that commit with the same toolchain file twice —
+once unpatched, once with `proposed/SpacewasmRustTarget.cmake` included by the
+consuming project — and compares the architecture of the resulting archive.
 
 | Variant | cargo target dir | archive |
 | --- | --- | --- |
