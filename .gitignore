@@ -1,0 +1,17 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Case scratch space
+/work/
+/out/
+build/
+_build/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
