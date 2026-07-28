@@ -67,7 +67,7 @@ make_parent() {
 echo "== A: parent WITHOUT include(GNUInstallDirs) =="
 echo "   (this is the example from crates/spacewasm_c_api/README.md)"
 make_parent "$WORK/parent-a" without
-cmake -S "$WORK/parent-a" -B "$WORK/build-a" -DCMAKE_BUILD_TYPE=Debug 2>&1 | tail -8
+cmake -S "$WORK/parent-a" -B "$WORK/build-a" -DCMAKE_BUILD_TYPE=Debug 2>&1 | tail -16
 A_EXIT=${PIPESTATUS[0]}
 echo "A_EXIT=$A_EXIT"
 echo

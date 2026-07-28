@@ -68,7 +68,7 @@ echo "CONFIGURE_EXIT=$CFG_EXIT"
 echo
 
 echo "== what CMake was told (toolchain file) =="
-grep -E "CMAKE_SYSTEM_NAME|CMAKE_SYSTEM_PROCESSOR|CMAKE_C_FLAGS_INIT" "$TOOLCHAIN"
+grep -E "^set\((CMAKE_SYSTEM_NAME|CMAKE_SYSTEM_PROCESSOR|CMAKE_C_FLAGS_INIT)" "$TOOLCHAIN"
 echo
 echo "== what CMake recorded =="
 grep -E "CMAKE_TOOLCHAIN_FILE|SPACEWASM_TARGET" "$BUILD/CMakeCache.txt" 2>/dev/null || true
