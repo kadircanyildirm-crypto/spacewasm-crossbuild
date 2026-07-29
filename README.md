@@ -25,8 +25,9 @@ docker build -t spacewasm-dev dev/
 ```
 
 Provides Rust stable, WABT 1.0.41 (the spectests shell out to `wat2wasm`),
-`gcc-multilib`, CMake, clang, and the `i686-unknown-linux-gnu`,
-`wasm32-unknown-unknown` and `wasm32-wasip1` targets.
+`gcc-multilib`, the `aarch64-linux-gnu` cross tools, CMake, clang, and the
+`i686-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `wasm32-unknown-unknown`
+and `wasm32-wasip1` targets.
 
 Verified baseline on `nasa/spacewasm@8abced5` (2026-07-27), inside this image:
 
@@ -84,33 +85,77 @@ CMake builds should pass their linker and sysroots to cargo — a concrete
 starting point, since the current default is the *host* triple from `rustc -vV`
 and a mismatch surfaces only at link time.
 
+### `cases/cross-guard/`
+
+Pinned to `ca42f9c`, and to `nasa/fprime@307acd7` for the toolchain files.
+
+Uses F´'s own `cmake/toolchain/aarch64-linux.cmake` rather than a hand-written
+toolchain file. That file sets `CMAKE_SYSTEM_PROCESSOR` and includes
+`helpers/arm-linux-base.cmake`, which sets `CMAKE_SYSTEM_NAME` — so CMake enters
+cross-compiling mode. `arm-hf-linux.cmake`, `arm-sf-linux.cmake` and
+`raspberrypi.cmake` all include the same helper.
+
+| Variant | configure | archive |
+| --- | --- | --- |
+| upstream as-is, `SPACEWASM_TARGET` unset | 0 | ELF64 / **x86-64** (the host) |
+| with `proposed/SpacewasmCrossGuard.cmake` | **error** | — |
+| with the guard, triple given explicitly | 0 | ELF64 / AArch64 |
+
+The first row is the point: a clean build, no diagnostic, and an archive for the
+wrong machine.
+
 ### `cases/cross-triple-fix/`
 
-Pinned to `ca42f9c`. Builds that commit with the same toolchain file twice —
-once unpatched, once with `proposed/SpacewasmRustTarget.cmake` included by the
-consuming project — and compares the architecture of the resulting archive.
+Pinned to `ca42f9c`. Demonstrates the *withdrawn* approach — see `proposed/`
+below. Builds that commit with the same toolchain file twice, once unpatched and
+once with `proposed/SpacewasmRustTarget.cmake` included by the consuming
+project, and compares the architecture of the resulting archive.
 
 | Variant | cargo target dir | archive |
 | --- | --- | --- |
 | unpatched | `x86_64-unknown-linux-gnu` | ELF64 / x86-64 |
 | with the module | `i686-unknown-linux-gnu` | ELF32 / Intel 80386 |
 
+Kept because the measurement is still valid and reproducible; the design it
+demonstrates is not the one being proposed any more.
+
 ## `proposed/`
 
-`SpacewasmRustTarget.cmake` derives `SPACEWASM_TARGET` from `CMAKE_SYSTEM_NAME`
-and `CMAKE_SYSTEM_PROCESSOR`, and hard-errors when cross-compiling for a
-combination it has no mapping for, rather than silently falling back to the
-host triple.
+**`SpacewasmCrossGuard.cmake`** — the current proposal, three lines. It derives
+nothing. Specifying `SPACEWASM_TARGET` by hand stays the contract, exactly as in
+Wasmtime's `c-api`; the guard only declines to fall back to the `rustc` host
+triple, silently and with a zero exit code, once a toolchain file has put CMake
+into cross-compiling mode.
 
-It requires no upstream change: `SPACEWASM_TARGET` is a `CACHE STRING`, so
-setting it before `add_subdirectory()` leaves the existing
-`if(SPACEWASM_TARGET STREQUAL "")` branch untouched.
+Two limits, stated up front:
 
-It covers the triple only. Forwarding the C toolchain — `CC_<triple>`,
-`AR_<triple>`, `CFLAGS_<triple>`, `CARGO_TARGET_<TRIPLE>_LINKER`, `--sysroot` —
-has to happen on the cargo invocation itself, which lives in the
-`ExternalProject_Add` `BUILD_COMMAND` upstream. That part is not implemented
-here; it is a proposal for discussion on #112.
+- A toolchain file that sets `CMAKE_SYSTEM_PROCESSOR` without
+  `CMAKE_SYSTEM_NAME` leaves `CMAKE_CROSSCOMPILING` false, and CMake resets the
+  processor to the host value — no signal survives for the guard to read.
+- A toolchain file that deliberately targets the host now has to say so.
+
+**`SpacewasmRustTarget.cmake`** — **withdrawn.** It derived the triple from
+`CMAKE_SYSTEM_NAME` and `CMAKE_SYSTEM_PROCESSOR`. The maintainer's objection on
+[#112](https://github.com/nasa/spacewasm/issues/112#issuecomment-5112166321) is
+sound: `CMAKE_SYSTEM_PROCESSOR` holds whatever the toolchain file wrote there,
+cross-compilers do not share one naming scheme, and the closest prior art
+requires the triple explicitly. The file is kept as the record of what was
+proposed, with the reasoning at the top.
+
+Forwarding a C toolchain to cargo — `CC_<triple>`, `AR_<triple>`, `--sysroot`
+and friends — was also proposed on #112 and **withdrawn**: `spacewasm` and
+`spacewasm_c_api` are both `#![no_std]`, the dependency tree is
+`spacewasm_c_api -> spacewasm -> libm`, and `build.rs` only reaches for cbindgen
+behind the `codegen` feature. Nothing in the cargo half of the build wants a C
+compiler, an archiver or a sysroot.
+
+## Upstream discussion
+
+| Thread | What was reported | Outcome |
+| --- | --- | --- |
+| [PR #130](https://github.com/nasa/spacewasm/pull/130#issuecomment-5101181671) | `install()` calls with no `GNUInstallDirs` | Fixed the same day in `ca42f9c` |
+| [Issue #112](https://github.com/nasa/spacewasm/issues/112#issuecomment-5110422185) | Triple derivation + C toolchain forwarding | Both withdrawn after [maintainer review](https://github.com/nasa/spacewasm/issues/112#issuecomment-5112166321) |
+| [Issue #112](https://github.com/nasa/spacewasm/issues/112#issuecomment-5114286630) | The three-line cross-compile guard | Open |
 
 ## Reporting
 

@@ -1,3 +1,19 @@
+# ============================================================================
+# WITHDRAWN — kept as the record of what was proposed, not as a recommendation.
+#
+# Proposed on nasa/spacewasm#112 and withdrawn after the maintainer's reply:
+# https://github.com/nasa/spacewasm/issues/112#issuecomment-5112166321
+#
+# The objection is sound. CMAKE_SYSTEM_PROCESSOR is set by whatever the
+# toolchain file happens to write there, cross-compilers do not follow one
+# naming scheme, and Wasmtime's c-api — the closest prior art — requires the
+# triple to be given explicitly and defaults to the host otherwise. Guessing is
+# not worth the failure modes it introduces.
+#
+# What survived is the much smaller SpacewasmCrossGuard.cmake in this directory,
+# which derives nothing and only refuses the silent host fallback.
+# ============================================================================
+#
 # Derive SPACEWASM_TARGET (a Rust target triple) from CMake's own
 # cross-compilation variables, so a consuming project does not have to keep a
 # hand-written triple in sync with its toolchain file.
